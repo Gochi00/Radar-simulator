@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EW Simulation: Helicopter Self-Protection Jammer (10W-100W) vs Air Defence Radar</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --radar-cyan: #00e5ff;
+      --radar-green: #00ff66;
+      --jammer-amber: #ffaa00;
+      --jammer-red: #ff3344;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #05080e;
+      color: #cbd5e1;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .font-hud {
+      font-family: 'Orbitron', monospace;
+    }
+
+    /* CRT scanline display effect */
+    .crt-overlay {
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.28) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+    }
+
+    /* Custom range sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 9999px;
+      height: 6px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #00e5ff;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.9);
+      cursor: pointer;
+      border: 2px solid #05080e;
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+    input[type=range].amber-thumb::-webkit-slider-thumb {
+      background: #ffaa00;
+      box-shadow: 0 0 10px rgba(255, 170, 0, 0.9);
+    }
+
+    /* Glowing borders */
+    .glow-box-cyan {
+      box-shadow: 0 0 18px rgba(0, 229, 255, 0.18), inset 0 0 15px rgba(0, 229, 255, 0.05);
+      border-color: rgba(0, 229, 255, 0.4);
+    }
+    .glow-box-amber {
+      box-shadow: 0 0 18px rgba(255, 170, 0, 0.25), inset 0 0 15px rgba(255, 170, 0, 0.06);
+      border-color: rgba(255, 170, 0, 0.6);
+    }
+    .glow-box-red {
+      box-shadow: 0 0 22px rgba(255, 51, 68, 0.35), inset 0 0 18px rgba(255, 51, 68, 0.09);
+      border-color: rgba(255, 51, 68, 0.7);
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #070c14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="bg-[#05080e] text-slate-300 min-h-screen flex flex-col antialiased">
+  
+  <!-- Header Bar -->
+  <header class="border-b border-slate-800 bg-[#080d16]/95 backdrop-blur px-4 py-3 sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+    <div class="flex items-center space-x-3">
+      <div class="p-2 rounded bg-cyan-950/70 border border-cyan-500/40 text-cyan-400">
+        <i data-lucide="shield" class="w-5 h-5 animate-pulse"></i>
+      </div>
+      <div>
+        <h1 class="font-hud font-bold text-lg md:text-xl tracking-wider text-slate-100 flex items-center gap-2">
+          EW HELI-SPJ <span class="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">10W – 100W TRANSMITTER SIM</span>
+        </h1>
+        <p class="text-xs text-slate-400">Tactical Jammer (<span class="font-mono-code text-amber-400">10–100 W</span>, 1/R²) vs Air Defence Radar (1/R⁴) Burn-Through Evaluation</p>
+      </div>
+    </div>
+
+    <!-- Quick Scenario Presets -->
+    <div class="flex items-center flex-wrap gap-2 text-xs">
+      <span class="text-slate-400 font-mono-code mr-1">PRESETS:</span>
+      <button onclick="applyPreset('standard_attack')" class="px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500 text-slate-200 transition">
+        Attack Heli (50W SPJ)
+      </button>
+      <button onclick="applyPreset('max_power_spot')" class="px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-amber-500 text-amber-300 transition">
+        High Power (100W Spot)
+      </button>
+      <button onclick="applyPreset('stealth_recon')" class="px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500 text-slate-200 transition">
+        Low-RCS Recon (20W)
+      </button>
+      <button onclick="applyPreset('heavy_cargo')" class="px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-rose-500 text-rose-300 transition">
+        Heavy Heli (10W SPJ)
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Grid Content -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-3 md:p-5 max-w-[1760px] mx-auto w-full">
+    
+    <!-- LEFT PANEL: Tactical PPI Display (7 cols on lg) -->
+    <section class="lg:col-span-7 flex flex-col gap-3">
+      <!-- Tactical PPI Canvas Container -->
+      <div class="relative bg-[#070b12] rounded-xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col min-h-[520px] lg:h-[620px]">
+        
+        <!-- Canvas Bar Controls -->
+        <div class="bg-[#0b101c] px-4 py-2 border-b border-slate-800 flex items-center justify-between z-10">
+          <div class="flex items-center space-x-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+            <span class="font-hud text-xs font-semibold text-emerald-400 tracking-wider">TACTICAL PLAN POSITION INDICATOR (PPI)</span>
+            <span class="text-xs text-slate-500 font-mono-code">| GRID: 60 km</span>
+          </div>
+
+          <div class="flex items-center space-x-2 text-xs">
+            <!-- Sweep Toggle -->
+            <button id="sweepToggleBtn" onclick="toggleRadarSweep()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-code border border-slate-700 flex items-center gap-1.5">
+              <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Sweep <span id="sweepStatusText" class="text-emerald-400">ON</span>
+            </button>
+            <!-- Audio Toggle -->
+            <button id="audioToggleBtn" onclick="toggleAudio()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-code border border-slate-700 flex items-center gap-1.5">
+              <i data-lucide="volume-2" id="audioIcon" class="w-3.5 h-3.5"></i> Sound <span id="audioStatusText" class="text-slate-500">OFF</span>
+            </button>
+            <button onclick="resetPosition()" title="Reset Helicopter Position" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-code border border-slate-700">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="relative flex-1 w-full h-full bg-[#050910] cursor-crosshair overflow-hidden" id="canvasContainer">
+          <canvas id="radarCanvas" class="w-full h-full block"></canvas>
+          <div class="crt-overlay absolute inset-0"></div>
+
+          <!-- Drag Guidance -->
+          <div class="absolute bottom-3 left-3 bg-black/65 backdrop-blur border border-slate-700/60 rounded px-2.5 py-1 text-[11px] font-mono-code text-slate-400 pointer-events-none flex items-center gap-1.5 shadow">
+            <i data-lucide="hand" class="w-3.5 h-3.5 text-cyan-400"></i> Click & Drag helicopter or click any coordinate to reposition
+          </div>
+
+          <!-- Compass Cardinal Indicators -->
+          <span class="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-hud text-cyan-500/70 font-bold pointer-events-none">000° N</span>
+          <span class="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-hud text-cyan-500/70 font-bold pointer-events-none">180° S</span>
+          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-hud text-cyan-500/70 font-bold pointer-events-none">090° E</span>
+          <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-hud text-cyan-500/70 font-bold pointer-events-none">270° W</span>
+        </div>
+
+        <!-- PROMINENT STATUS MESSAGE BOX (Required) -->
+        <div id="statusBanner" class="border-t transition-colors duration-300 px-4 py-3 flex items-center justify-between glow-box-amber bg-amber-950/30 border-amber-500/60">
+          <div class="flex items-center gap-3">
+            <div id="statusIconContainer" class="p-2 rounded bg-amber-900/60 border border-amber-500 text-amber-300 animate-pulse">
+              <i data-lucide="shield-alert" id="statusLucideIcon" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="statusTitle" class="font-hud font-bold text-base md:text-lg text-amber-300 tracking-wider">
+                  RADAR JAMMED / SCREENED
+                </span>
+                <span id="statusTag" class="text-[10px] px-2 py-0.5 rounded font-mono-code uppercase bg-amber-900/70 border border-amber-600 text-amber-200">
+                  S/J &lt; THRESHOLD
+                </span>
+              </div>
+              <p id="statusDescription" class="text-xs text-slate-300">
+                Jammer noise strobe blinds the radar display. Helicopter echo is cloaked inside noise floor.
+              </p>
+            </div>
+          </div>
+          <div class="text-right hidden sm:block">
+            <div class="text-[11px] font-mono-code text-slate-400">TACTICAL STATE</div>
+            <div id="radarStateBadge" class="font-hud font-bold text-sm text-amber-400">NOISE STROBE ONLY</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Live Telemetry Quick Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono-code text-xs">
+        <div class="bg-[#0c121d] border border-slate-800 rounded-lg p-2.5">
+          <div class="text-slate-400 text-[10px]">CURRENT RANGE (R)</div>
+          <div id="quickRange" class="text-base font-bold text-cyan-300">31.2 km</div>
+          <div id="quickAzimuth" class="text-[10px] text-slate-500">Bearing: 045°</div>
+        </div>
+
+        <div class="bg-[#0c121d] border border-slate-800 rounded-lg p-2.5">
+          <div class="text-slate-400 text-[10px]">BURN-THROUGH (R_bt)</div>
+          <div id="quickRbt" class="text-base font-bold text-emerald-400">18.5 km</div>
+          <div id="quickDeltaR" class="text-[10px] text-amber-400">Safe: +12.7 km</div>
+        </div>
+
+        <div class="bg-[#0c121d] border border-slate-800 rounded-lg p-2.5">
+          <div class="text-slate-400 text-[10px]">SIGNAL-TO-JAM (S/J)</div>
+          <div id="quickSJ" class="text-base font-bold text-amber-400">-4.5 dB</div>
+          <div class="text-[10px] text-slate-500">Min Req: <span id="quickSJReq" class="text-slate-300">+3.0 dB</span></div>
+        </div>
+
+        <div class="bg-[#0c121d] border border-slate-800 rounded-lg p-2.5">
+          <div class="text-slate-400 text-[10px]">JAMMER ERP (P_j·G_j)</div>
+          <div id="quickJammerErp" class="text-base font-bold text-amber-400">316.2 W</div>
+          <div id="quickJammerErpDbm" class="text-[10px] text-slate-500">55.0 dBm (50W + 8dBi)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Parameters, Sliders & Math Derivations (5 cols on lg) -->
+    <section class="lg:col-span-5 flex flex-col gap-4">
+      
+      <!-- Container with Tabs -->
+      <div class="bg-[#070b12] rounded-xl border border-slate-800 shadow-xl overflow-hidden flex flex-col">
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-slate-800 bg-[#0a0f19] text-xs font-semibold">
+          <button id="tabControlsBtn" onclick="switchRightTab('controls')" class="flex-1 py-3 px-4 border-b-2 border-cyan-400 text-cyan-300 font-hud tracking-wide flex items-center justify-center gap-2">
+            <i data-lucide="sliders" class="w-4 h-4"></i> EW CONTROLS
+          </button>
+          <button id="tabMathBtn" onclick="switchRightTab('math')" class="flex-1 py-3 px-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-hud tracking-wide flex items-center justify-center gap-2">
+            <i data-lucide="book-open" class="w-4 h-4"></i> RADAR PHYSICS & MATH
+          </button>
+        </div>
+
+        <!-- TAB CONTENT 1: CONTROLS & SLIDERS -->
+        <div id="tabControls" class="p-4 space-y-4 max-h-[640px] overflow-y-auto">
+          
+          <!-- SECTION 1: JAMMER (10W TO 100W TRANSMITTER) -->
+          <div class="bg-[#0d1424] p-3.5 rounded-lg border border-amber-500/35 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+                <span class="font-hud text-xs font-bold text-amber-400">SELF-PROTECTION JAMMER (SPJ)</span>
+              </div>
+              <!-- Jammer Switch -->
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="jammerPowerToggle" class="sr-only peer" checked onchange="handleJammerToggle()">
+                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                <span class="ml-2 font-mono-code text-xs font-bold" id="jammerToggleLabel">ACTIVE</span>
+              </label>
+            </div>
+
+            <!-- Jammer RF Output Power (10W to 100W) -->
+            <div>
+              <div class="flex justify-between text-xs font-mono-code mb-1">
+                <span class="text-slate-300">Jammer RF Power (P_j):</span>
+                <span id="val_jammerPj" class="text-amber-400 font-bold">50 W (47.0 dBm)</span>
+              </div>
+              <input type="range" id="slider_jammerPj" class="w-full amber-thumb" min="10" max="100" step="1" value="50" oninput="updateParameters()">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono-code mt-0.5">
+                <span>10 W (Min)</span>
+                <span>50 W (Default)</span>
+                <span>100 W (Max)</span>
+              </div>
+            </div>
+
+            <!-- Jammer Antenna Gain -->
+            <div>
+              <div class="flex justify-between text-xs font-mono-code mb-1">
+                <span class="text-slate-300">Jammer Antenna Gain (G_j):</span>
+                <span id="val_jammerGj" class="text-amber-400 font-bold">8.0 dBi (6.3×)</span>
+              </div>
+              <input type="range" id="slider_jammerGj" class="w-full amber-thumb" min="0" max="15" step="0.5" value="8.0" oninput="updateParameters()">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono-code mt-0.5">
+                <span>0 dBi (Omni blade)</span>
+                <span>8 dBi (Horn antenna)</span>
+                <span>15 dBi (Phased array)</span>
+              </div>
+            </div>
+
+            <!-- Calculated Jammer ERP Display Box -->
+            <div class="p-2 rounded bg-amber-950/25 border border-amber-800/40 flex items-center justify-between font-mono-code text-xs">
+              <span class="text-slate-400">Computed Jammer ERP (P_j · G_j):</span>
+              <span id="box_jammerErp" class="font-bold text-amber-300 text-sm">315.5 W (55.0 dBm)</span>
+            </div>
+
+            <!-- Jammer Bandwidth -->
+            <div>
+              <div class="flex justify-between text-xs font-mono-code mb-1">
+                <span class="text-slate-300">Jammer RF Bandwidth (B_j):</span>
+                <span id="val_jammerBw" class="text-amber-400 font-bold">50 MHz</span>
+              </div>
+              <input type="range" id="slider_jammerBw" class="w-full amber-thumb" min="10" max="500" step="5" value="50" oninput="updateParameters()">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono-code mt-0.5">
+                <span>10 MHz (Spot)</span>
+                <span>50 MHz (Narrow)</span>
+                <span>500 MHz (Barrage)</span>
+              </div>
+            </div>
+
+            <!-- Jammer Mode Presets -->
+            <div class="flex items-center gap-2 pt-1 text-xs">
+              <span class="text-[11px] text-slate-400 font-mono-code">MODE:</span>
+              <button onclick="setJammerPowerAndBw(100, 15)" class="px-2 py-0.5 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700">100W Spot</button>
+              <button onclick="setJammerPowerAndBw(50, 50)" class="px-2 py-0.5 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700">50W Responsive</button>
+              <button onclick="setJammerPowerAndBw(25, 200)" class="px-2 py-0.5 rounded text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700">25W Barrage</button>
+            </div>
+          </div>
+
+          <!-- SECTION 2: TARGET HELICOPTER (RCS) -->
+          <div class="bg-[#0c1322] p-3.5 rounded-lg border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="plane" class="w-4 h-4 text-cyan-400"></i>
+                <span class="font-hud text-xs font-bold text-slate-200">TARGET HELICOPTER (RCS)</span>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs font-mono-code mb-1">
+                <span class="text-slate-300">Radar Cross Section (σ):</span>
+                <span id="val_targetRcs" class="text-cyan-400 font-bold">3.00 m² (4.8 dBsm)</span>
+              </div>
+              <input type="range" id="slider_targetRcs" class="w-full" min="0.05" max="20" step="0.05" value="3.0" oninput="updateParameters()">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono-code mt-0.5">
+                <span>0.05 m² (Stealth Mod)</span>
+                <span>3.0 m² (Attack Heli)</span>
+                <span>20 m² (Heavy Transport)</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-1.5 pt-1 text-xs">
+              <button onclick="setRcs(0.1)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-center">
+                Low-RCS (0.1 m²)
+              </button>
+              <button onclick="setRcs(3.0)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-center">
+                Attack (3.0 m²)
+              </button>
+              <button onclick="setRcs(15.0)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-center">
+                Heavy (15.0 m²)
+              </button>
+            </div>
+          </div>
+
+          <!-- SECTION 3: AIR DEFENCE RADAR -->
+          <div class="bg-[#0c1322] p-3.5 rounded-lg border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="tower-control" class="w-4 h-4 text-emerald-400"></i>
+                <span class="font-hud text-xs font-bold text-emerald-400">AIR DEFENCE RADAR</span>
+              </div>
+            </div>
+
+            <!-- Peak Power -->
+            <div>
+              <div class="flex justify-between text-xs font-mono-code mb-1">
+                <span class="text-slate-300">Peak Transmit Power (P_t):</span>
+                <span id="val_radarPt" class="text-emerald-400 font-bold">150 kW (81.8 dBm)</span>
+              </div>
+              <input type="range" id="slider_radarPt" class="w-full" min="50" max="1000" step="10" value="150" oninput="updateParameters()">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono-code mt-0.5">
+                <span>50 kW (SHORAD)</span>
+                <span>150 kW (Medium SAM)</span>
+                <span>1000 kW (1 MW Early Warn)</span>
+              </div>
+            </div>
+
+            <!-- Antenna Gain -->
+            <div>
+              <div class="flex justify-between text-xs font-mono-code mb-1">
+                <span class="text-slate-300">Antenna Gain (G_t = G_r):</span>
+                <span id="val_radarGain" class="text-emerald-400 font-bold">34.0 dBi</span>
+              </div>
+              <input type="range" id="slider_radarGain" class="w-full" min="25" max="45" step="0.5" value="34" oninput="updateParameters()">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono-code mt-0.5">
+                <span>25 dBi</span>
+                <span>34 dBi (Fire Control)</span>
+                <span>45 dBi (High Gain)</span>
+              </div>
+            </div>
+
+            <!-- Frequency -->
+            <div>
+              <div class="flex justify-between text-xs font-mono-code mb-1">
+                <span class="text-slate-300">Radar Frequency (f) / λ:</span>
+                <span id="val_radarFreq" class="text-emerald-400 font-bold">9.0 GHz (X-band)</span>
+              </div>
+              <input type="range" id="slider_radarFreq" class="w-full" min="2" max="12" step="0.5" value="9.0" oninput="updateParameters()">
+              <div class="flex justify-between text-[10px] text-slate-500 font-mono-code mt-0.5">
+                <span>2-4 GHz (S-band)</span>
+                <span>4-8 GHz (C-band)</span>
+                <span>8-12 GHz (X-band)</span>
+              </div>
+            </div>
+
+            <!-- Bandwidth & S/J Threshold -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <div class="flex justify-between text-[11px] font-mono-code mb-1">
+                  <span class="text-slate-300">Recv BW (B_r):</span>
+                  <span id="val_radarBr" class="text-emerald-400 font-bold">2.5 MHz</span>
+                </div>
+                <input type="range" id="slider_radarBr" class="w-full" min="0.5" max="10" step="0.5" value="2.5" oninput="updateParameters()">
+              </div>
+              <div>
+                <div class="flex justify-between text-[11px] font-mono-code mb-1">
+                  <span class="text-slate-300">Min (S/J)_min:</span>
+                  <span id="val_sjReq" class="text-emerald-400 font-bold">+3.0 dB</span>
+                </div>
+                <input type="range" id="slider_sjReq" class="w-full" min="0" max="12" step="0.5" value="3.0" oninput="updateParameters()">
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- TAB CONTENT 2: RADAR EQUATIONS & EW DERIVATIONS -->
+        <div id="tabMath" class="p-4 space-y-4 max-h-[640px] overflow-y-auto hidden text-xs leading-relaxed">
+          
+          <div class="bg-cyan-950/30 border border-cyan-800/60 rounded-lg p-3">
+            <h4 class="font-hud text-cyan-300 font-bold text-xs uppercase mb-1">The 1/R⁴ vs 1/R² Power Law Principle</h4>
+            <p class="text-slate-300">
+              Radar energy propagates forward to the helicopter and then scatters back to the receiver, experiencing a two-way spherical loss of <span class="font-mono-code text-cyan-400">1/R⁴</span>. In contrast, the helicopter's Self-Protection Jammer (<span class="font-mono-code text-amber-400">10 W to 100 W</span>) emits directly into the radar receiver over a one-way path, decaying at <span class="font-mono-code text-amber-400">1/R²</span>.
+            </p>
+          </div>
+
+          <!-- Equation 1: Radar Return -->
+          <div class="bg-[#0b111c] border border-slate-800 rounded-lg p-3 space-y-1.5">
+            <div class="flex justify-between items-center">
+              <span class="font-hud font-bold text-slate-200">1. RADAR RECEIVED ECHO POWER (S_r)</span>
+              <span class="text-[10px] font-mono-code text-cyan-400">Round-Trip (1/R⁴)</span>
+            </div>
+            <div id="katexRadarEq" class="overflow-x-auto py-1 text-center bg-black/40 rounded border border-slate-900"></div>
+            <p class="text-[11px] text-slate-400">
+              Where <span class="text-slate-200 font-mono-code">P_t</span> is radar peak power, <span class="text-slate-200 font-mono-code">G_t, G_r</span> are antenna gains, <span class="text-slate-200 font-mono-code">λ = c/f</span> is carrier wavelength, <span class="text-slate-200 font-mono-code">σ</span> is helicopter RCS, and <span class="text-slate-200 font-mono-code">R</span> is slant distance.
+            </p>
+          </div>
+
+          <!-- Equation 2: Jammer Received Power -->
+          <div class="bg-[#0b111c] border border-slate-800 rounded-lg p-3 space-y-1.5">
+            <div class="flex justify-between items-center">
+              <span class="font-hud font-bold text-slate-200">2. RECEIVED JAMMING POWER (J_r)</span>
+              <span class="text-[10px] font-mono-code text-amber-400">Direct Path (1/R²)</span>
+            </div>
+            <div id="katexJammerEq" class="overflow-x-auto py-1 text-center bg-black/40 rounded border border-slate-900"></div>
+            <p class="text-[11px] text-slate-400">
+              Where <span class="text-slate-200 font-mono-code">P_j</span> is Jammer Transmitter Power (10W–100W), <span class="text-slate-200 font-mono-code">G_j</span> is jammer antenna gain, <span class="text-slate-200 font-mono-code">ERP = P_j · G_j</span>, and <span class="text-slate-200 font-mono-code">B_r / B_j</span> is the spectral dilution factor collected inside the radar's IF filter.
+            </p>
+          </div>
+
+          <!-- Equation 3: S/J Ratio & Burn-Through Range Derivation -->
+          <div class="bg-[#0b111c] border border-slate-800 rounded-lg p-3 space-y-1.5">
+            <div class="flex justify-between items-center">
+              <span class="font-hud font-bold text-slate-200">3. BURN-THROUGH RANGE FORMULA (R_bt)</span>
+              <span class="text-[10px] font-mono-code text-emerald-400">Condition: S_r / J_r ≥ (S/J)_min</span>
+            </div>
+            <div id="katexSJEq" class="overflow-x-auto py-1 text-center bg-black/40 rounded border border-slate-900"></div>
+            <div id="katexRbtEq" class="overflow-x-auto py-1 text-center bg-black/40 rounded border border-slate-900"></div>
+            <p class="text-[11px] text-slate-400">
+              Setting <span class="font-mono-code text-slate-200">S_r / J_r = (S/J)_min</span> yields the exact analytical burn-through range <span class="font-mono-code text-emerald-400">R_bt</span>.
+              Radar receive gain <span class="font-mono-code text-slate-200">G_r</span> and radar wavelength <span class="font-mono-code text-slate-200">λ</span> cancel out completely!
+            </p>
+          </div>
+
+          <!-- Dynamic Live Substitution Breakdown -->
+          <div class="bg-[#0e1627] border border-cyan-800/60 rounded-lg p-3 space-y-2 font-mono-code text-[11px]">
+            <div class="font-hud text-cyan-300 text-xs font-bold">LIVE NUMERICAL EVALUATION AT CURRENT SLIDER VALUES</div>
+            <div class="flex justify-between border-b border-slate-800 pb-1">
+              <span>Jammer ERP (P_j · G_j):</span>
+              <span id="mathJammerErpVal" class="text-amber-400 font-bold">...</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-1">
+              <span>Target Echo Power (S_r):</span>
+              <span id="mathSrValue" class="text-cyan-400 font-bold">...</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-1">
+              <span>Jammer Received (J_r):</span>
+              <span id="mathJrValue" class="text-amber-400 font-bold">...</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-800 pb-1">
+              <span>Signal-to-Jam (S/J):</span>
+              <span id="mathSJValue" class="font-bold">...</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Burn-Through Range (R_bt):</span>
+              <span id="mathRbtValue" class="text-emerald-400 font-bold">...</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Tactical Guidance Callout -->
+      <div class="bg-[#090f19] border border-slate-800 rounded-xl p-3.5 flex items-start space-x-3 text-xs shadow-lg">
+        <div class="p-2 rounded bg-amber-950/60 text-amber-400 shrink-0">
+          <i data-lucide="info" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <div class="font-bold text-slate-200 mb-0.5">Self-Protection Jamming Rule of Thumb</div>
+          <p class="text-slate-400 leading-relaxed">
+            With a modest onboard transmitter (<span class="font-mono-code text-amber-300">10 W to 100 W</span>), a directional antenna gain of <span class="font-mono-code text-amber-300">8–12 dBi</span> concentrates sufficient flux along the radar line of sight to screen a helicopter at standoff ranges (&gt;20 km). Closer in, burn-through occurs as the helicopter's skin reflection overwhelms the jammer.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Audio Tone.js synthetic sound generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <script>
+    // System simulation state
+    const state = {
+      radar: {
+        x: 0,
+        y: 0,
+        Pt_kW: 150,        // Transmit power in kW (50 - 1000 kW)
+        Gt_dBi: 34,        // Antenna gain in dBi (25 - 45 dBi)
+        freq_GHz: 9.0,     // Carrier frequency in GHz (2 - 12 GHz)
+        Br_MHz: 2.5,       // Receiver IF bandwidth in MHz (0.5 - 10 MHz)
+        sjReq_dB: 3.0,     // Minimum S/J ratio in dB (0 - 12 dB)
+        azimuth: 0,        // Rotating sweep angle in radians
+        sweepSpeed: 0.022,
+        isSweeping: true
+      },
+      target: {
+        x_km: 22,          // Position in km relative to radar
+        y_km: -22,
+        rcs_m2: 3.0,       // Radar Cross Section in m²
+        isDragging: false
+      },
+      jammer: {
+        active: true,
+        Pj_W: 50,          // Jammer transmitter power: 10 W to 100 W
+        Gj_dBi: 8.0,       // Jammer antenna gain in dBi: 0 to 15 dBi
+        Bj_MHz: 50         // Jammer RF bandwidth in MHz: 10 to 500 MHz
+      },
+      view: {
+        maxRange_km: 60,   // Radius of the radar scope in km
+        scale: 1,
+        centerX: 0,
+        centerY: 0
+      },
+      audioEnabled: false
+    };
+
+    const C = 299792458; // Speed of light in m/s
+
+    // DOM references
+    const canvas = document.getElementById('radarCanvas');
+    const ctx = canvas.getContext('2d');
+    const canvasContainer = document.getElementById('canvasContainer');
+
+    let synth = null;
+    let noiseGen = null;
+    let noiseFilter = null;
+
+    function initAudio() {
+      if (synth) return;
+      try {
+        synth = new Tone.Synth({
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.005, decay: 0.08, sustain: 0.01, release: 0.1 }
+        }).toDestination();
+        synth.volume.value = -18;
+
+        noiseGen = new Tone.Noise('pink');
+        noiseFilter = new Tone.Filter(750, 'lowpass');
+        noiseGen.connect(noiseFilter);
+        noiseFilter.toDestination();
+        noiseGen.volume.value = -32;
+      } catch (e) {
+        console.warn("Audio initialization deferred:", e);
+      }
+    }
+
+    function toggleAudio() {
+      if (!state.audioEnabled) {
+        Tone.start().then(() => {
+          initAudio();
+          state.audioEnabled = true;
+          document.getElementById('audioStatusText').innerText = "ON";
+          document.getElementById('audioStatusText').classList.replace('text-slate-500', 'text-cyan-400');
+          if (state.jammer.active && noiseGen) noiseGen.start();
+        });
+      } else {
+        state.audioEnabled = false;
+        document.getElementById('audioStatusText').innerText = "OFF";
+        document.getElementById('audioStatusText').classList.replace('text-cyan-400', 'text-slate-500');
+        if (noiseGen) noiseGen.stop();
+      }
+    }
+
+    function playRadarHitTone(isBurnThrough) {
+      if (!state.audioEnabled || !synth) return;
+      try {
+        if (isBurnThrough) {
+          synth.triggerAttackRelease('C6', '16n');
+        } else if (state.jammer.active) {
+          synth.triggerAttackRelease('F4', '32n');
+        } else {
+          synth.triggerAttackRelease('E5', '16n');
+        }
+      } catch (err) {}
+    }
+
+    // Mathematical calculations
+    function computePhysics() {
+      const R_km = Math.hypot(state.target.x_km, state.target.y_km);
+      const R_m = Math.max(R_km * 1000, 100); // Guard against R=0
+      
+      const lambda_m = C / (state.radar.freq_GHz * 1e9);
+      const Gt_linear = Math.pow(10, state.radar.Gt_dBi / 10);
+      const Pt_W = state.radar.Pt_kW * 1000;
+      const sigma = state.target.rcs_m2;
+
+      // 1. Radar Return Power S_r:
+      // S_r = (P_t * G_t * G_r * lambda^2 * sigma) / ((4 * pi)^3 * R^4)
+      const Gr_linear = Gt_linear; // Same antenna for monostatic radar
+      const numeratorS = Pt_W * Gt_linear * Gr_linear * Math.pow(lambda_m, 2) * sigma;
+      const denomS = Math.pow(4 * Math.PI, 3) * Math.pow(R_m, 4);
+      const Sr_W = numeratorS / denomS;
+      const Sr_dBm = 10 * Math.log10(Sr_W * 1000);
+
+      // Jammer ERP calculation:
+      const Gj_linear = Math.pow(10, state.jammer.Gj_dBi / 10);
+      const jammerERP_W = state.jammer.Pj_W * Gj_linear;
+      const jammerERP_dBm = 10 * Math.log10(jammerERP_W * 1000);
+
+      let Jr_W = 0;
+      let Jr_dBm = -999;
+      let Rbt_km = 0;
+      let sj_ratio_dB = 0;
+      let isBurnThrough = false;
+
+      const sj_min_linear = Math.pow(10, state.radar.sjReq_dB / 10);
+
+      if (state.jammer.active && state.jammer.Pj_W > 0) {
+        const Br_Hz = state.radar.Br_MHz * 1e6;
+        const Bj_Hz = state.jammer.Bj_MHz * 1e6;
+        const bwRatio = Math.min(1.0, Br_Hz / Bj_Hz); // Filter interception factor
+
+        // 2. Jammer received power at radar:
+        // J_r = (P_j * G_j * G_r * lambda^2) / ((4 * pi)^2 * R^2) * (B_r / B_j)
+        const numeratorJ = jammerERP_W * Gr_linear * Math.pow(lambda_m, 2) * bwRatio;
+        const denomJ = Math.pow(4 * Math.PI, 2) * Math.pow(R_m, 2);
+        Jr_W = numeratorJ / denomJ;
+        Jr_dBm = 10 * Math.log10(Jr_W * 1000);
+
+        // 3. S/J Ratio:
+        const sj_linear = Sr_W / Jr_W;
+        sj_ratio_dB = 10 * Math.log10(sj_linear);
+
+        // 4. Burn-Through Range R_bt:
+        // R_bt = sqrt( (P_t * G_t * sigma * B_j) / (4 * pi * (P_j * G_j) * B_r * (S/J)_min) )
+        const rbt_numerator = Pt_W * Gt_linear * sigma * Bj_Hz;
+        const rbt_denom = 4 * Math.PI * jammerERP_W * Br_Hz * sj_min_linear;
+        const Rbt_m = Math.sqrt(Math.max(0, rbt_numerator / rbt_denom));
+        Rbt_km = Rbt_m / 1000;
+
+        // Condition for Burn-Through
+        isBurnThrough = (R_km <= Rbt_km);
+      } else {
+        // Unjammed scenario
+        const noiseFloor_dBm = -105;
+        sj_ratio_dB = Sr_dBm - noiseFloor_dBm;
+        Rbt_km = 0;
+        isBurnThrough = (Sr_dBm > -100);
+      }
+
+      // Bearing calculation
+      let azimuthRad = Math.atan2(state.target.x_km, -state.target.y_km);
+      if (azimuthRad < 0) azimuthRad += 2 * Math.PI;
+      const azimuthDeg = (azimuthRad * 180 / Math.PI) % 360;
+
+      return {
+        R_km,
+        R_m,
+        jammerERP_W,
+        jammerERP_dBm,
+        Sr_W,
+        Sr_dBm,
+        Jr_W,
+        Jr_dBm,
+        sj_ratio_dB,
+        Rbt_km,
+        isBurnThrough,
+        azimuthDeg,
+        azimuthRad
+      };
+    }
+
+    function updateHUDReadouts(calc) {
+      document.getElementById('quickRange').innerText = `${calc.R_km.toFixed(1)} km`;
+      document.getElementById('quickAzimuth').innerText = `Bearing: ${calc.azimuthDeg.toFixed(0).padStart(3, '0')}°`;
+
+      // Jammer ERP readouts
+      document.getElementById('quickJammerErp').innerText = `${calc.jammerERP_W.toFixed(1)} W`;
+      document.getElementById('quickJammerErpDbm').innerText = `${calc.jammerERP_dBm.toFixed(1)} dBm (${state.jammer.Pj_W}W + ${state.jammer.Gj_dBi}dBi)`;
+      document.getElementById('box_jammerErp').innerText = `${calc.jammerERP_W.toFixed(1)} W (${calc.jammerERP_dBm.toFixed(1)} dBm)`;
+
+      // Burn-Through Readouts
+      if (state.jammer.active) {
+        document.getElementById('quickRbt').innerText = `${calc.Rbt_km.toFixed(1)} km`;
+        const delta = calc.R_km - calc.Rbt_km;
+        const deltaElem = document.getElementById('quickDeltaR');
+        if (delta > 0) {
+          deltaElem.innerText = `Screened (+${delta.toFixed(1)} km safe)`;
+          deltaElem.className = "text-[10px] text-amber-400";
+        } else {
+          deltaElem.innerText = `Burned Through (${Math.abs(delta).toFixed(1)} km penetrated)`;
+          deltaElem.className = "text-[10px] text-rose-400 font-bold";
+        }
+      } else {
+        document.getElementById('quickRbt').innerText = "N/A (Jammer OFF)";
+        document.getElementById('quickDeltaR').innerText = "Unscreened Target";
+        document.getElementById('quickDeltaR').className = "text-[10px] text-slate-500";
+      }
+
+      // S/J Ratio Card
+      const sjElem = document.getElementById('quickSJ');
+      if (state.jammer.active) {
+        sjElem.innerText = `${calc.sj_ratio_dB >= 0 ? '+' : ''}${calc.sj_ratio_dB.toFixed(1)} dB`;
+        sjElem.className = calc.isBurnThrough ? "text-base font-bold text-rose-400" : "text-base font-bold text-amber-400";
+      } else {
+        sjElem.innerText = "N/A (No Jam)";
+        sjElem.className = "text-base font-bold text-cyan-400";
+      }
+      document.getElementById('quickSJReq').innerText = `+${state.radar.sjReq_dB.toFixed(1)} dB`;
+
+      // STATUS MESSAGE BOX
+      const banner = document.getElementById('statusBanner');
+      const title = document.getElementById('statusTitle');
+      const desc = document.getElementById('statusDescription');
+      const tag = document.getElementById('statusTag');
+      const badge = document.getElementById('radarStateBadge');
+      const iconContainer = document.getElementById('statusIconContainer');
+
+      if (!state.jammer.active) {
+        banner.className = "border-t transition-colors duration-300 px-4 py-3 flex items-center justify-between glow-box-cyan bg-cyan-950/30 border-cyan-500/60";
+        title.innerText = "RADAR NORMAL ACQUISITION";
+        title.className = "font-hud font-bold text-base md:text-lg text-cyan-300 tracking-wider";
+        desc.innerText = "Jammer is OFF. Helicopter echo is unmasked and clearly tracked by air defence fire control.";
+        tag.innerText = "UNCONTESTED";
+        tag.className = "text-[10px] px-2 py-0.5 rounded font-mono-code uppercase bg-cyan-900/70 border border-cyan-600 text-cyan-200";
+        badge.innerText = "CLEAR TARGET LOCK";
+        badge.className = "font-hud font-bold text-sm text-cyan-400";
+        iconContainer.className = "p-2 rounded bg-cyan-900/60 border border-cyan-500 text-cyan-300";
+        iconContainer.innerHTML = '<i data-lucide="crosshair" class="w-6 h-6"></i>';
+      } else if (calc.isBurnThrough) {
+        banner.className = "border-t transition-colors duration-300 px-4 py-3 flex items-center justify-between glow-box-red bg-rose-950/40 border-rose-500/80";
+        title.innerText = "BURN-THROUGH OCCURRED (RADAR DETECTS HELICOPTER!)";
+        title.className = "font-hud font-bold text-base md:text-lg text-rose-300 tracking-wider";
+        desc.innerText = `Range (${calc.R_km.toFixed(1)} km) ≤ R_bt (${calc.Rbt_km.toFixed(1)} km). Radar skin return pierces through the 10W–100W jammer noise! Missile lock achieved!`;
+        tag.innerText = "S/J ≥ THRESHOLD";
+        tag.className = "text-[10px] px-2 py-0.5 rounded font-mono-code uppercase bg-rose-900/80 border border-rose-600 text-rose-200";
+        badge.innerText = "BURN-THROUGH SECTOR";
+        badge.className = "font-hud font-bold text-sm text-rose-400 animate-pulse";
+        iconContainer.className = "p-2 rounded bg-rose-900/60 border border-rose-500 text-rose-300";
+        iconContainer.innerHTML = '<i data-lucide="alert-triangle" class="w-6 h-6"></i>';
+      } else {
+        banner.className = "border-t transition-colors duration-300 px-4 py-3 flex items-center justify-between glow-box-amber bg-amber-950/30 border-amber-500/60";
+        title.innerText = "JAMMED / SCREENED (TARGET HIDDEN IN NOISE)";
+        title.className = "font-hud font-bold text-base md:text-lg text-amber-300 tracking-wider";
+        desc.innerText = `Range (${calc.R_km.toFixed(1)} km) > R_bt (${calc.Rbt_km.toFixed(1)} km). Jammer noise strobe obscures target skin echo. SAM fire control cannot lock!`;
+        tag.innerText = "S/J < THRESHOLD";
+        tag.className = "text-[10px] px-2 py-0.5 rounded font-mono-code uppercase bg-amber-900/70 border border-amber-600 text-amber-200";
+        badge.innerText = "NOISE STROBE ONLY";
+        badge.className = "font-hud font-bold text-sm text-amber-400";
+        iconContainer.className = "p-2 rounded bg-amber-900/60 border border-amber-500 text-amber-300 animate-pulse";
+        iconContainer.innerHTML = '<i data-lucide="shield-alert" class="w-6 h-6"></i>';
+      }
+
+      lucide.createIcons();
+
+      // Math breakdown updates
+      document.getElementById('mathJammerErpVal').innerText = `${calc.jammerERP_W.toFixed(1)} W (${calc.jammerERP_dBm.toFixed(1)} dBm)`;
+      document.getElementById('mathSrValue').innerText = `${calc.Sr_dBm.toFixed(2)} dBm (${calc.Sr_W.toExponential(3)} W)`;
+      document.getElementById('mathJrValue').innerText = state.jammer.active ? `${calc.Jr_dBm.toFixed(2)} dBm (${calc.Jr_W.toExponential(3)} W)` : "OFF (0 W)";
+      document.getElementById('mathSJValue').innerText = state.jammer.active ? `${calc.sj_ratio_dB.toFixed(2)} dB (Threshold: +${state.radar.sjReq_dB} dB)` : "Unjammed";
+      document.getElementById('mathSJValue').className = calc.isBurnThrough ? "text-rose-400 font-bold" : "text-amber-400 font-bold";
+      document.getElementById('mathRbtValue').innerText = state.jammer.active ? `${calc.Rbt_km.toFixed(2)} km` : "N/A";
+    }
+
+    function renderMathFormulas() {
+      try {
+        katex.render(
+          "S_r = \\frac{P_t \\cdot G_t \\cdot G_r \\cdot \\lambda^2 \\cdot \\sigma}{(4\\pi)^3 \\cdot R^4} \\quad \\propto \\frac{1}{R^4}",
+          document.getElementById('katexRadarEq'),
+          { throwOnError: false }
+        );
+
+        katex.render(
+          "J_r = \\frac{(P_j \\cdot G_j) \\cdot G_r \\cdot \\lambda^2}{(4\\pi)^2 \\cdot R^2} \\cdot \\left(\\frac{B_r}{B_j}\\right) \\quad \\propto \\frac{1}{R^2}",
+          document.getElementById('katexJammerEq'),
+          { throwOnError: false }
+        );
+
+        katex.render(
+          "\\frac{S_r}{J_r} = \\frac{P_t \\cdot G_t \\cdot \\sigma}{4\\pi \\cdot (P_j \\cdot G_j) \\cdot R^2} \\cdot \\left(\\frac{B_j}{B_r}\\right) \\ge \\left(\\frac{S}{J}\\right)_{\\min}",
+          document.getElementById('katexSJEq'),
+          { throwOnError: false }
+        );
+
+        katex.render(
+          "R_{bt} = \\sqrt{ \\frac{P_t \\cdot G_t \\cdot \\sigma \\cdot B_j}{4\\pi \\cdot (P_j \\cdot G_j) \\cdot B_r \\cdot (S/J)_{\\min}} }",
+          document.getElementById('katexRbtEq'),
+          { throwOnError: false }
+        );
+      } catch (err) {
+        console.error("KaTeX rendering error:", err);
+      }
+    }
+
+    function updateParameters() {
+      // Sliders read: Jammer Power explicitly 10W - 100W
+      state.jammer.Pj_W = parseFloat(document.getElementById('slider_jammerPj').value);
+      state.jammer.Gj_dBi = parseFloat(document.getElementById('slider_jammerGj').value);
+      state.jammer.Bj_MHz = parseFloat(document.getElementById('slider_jammerBw').value);
+
+      state.target.rcs_m2 = parseFloat(document.getElementById('slider_targetRcs').value);
+      state.radar.Pt_kW = parseFloat(document.getElementById('slider_radarPt').value);
+      state.radar.Gt_dBi = parseFloat(document.getElementById('slider_radarGain').value);
+      state.radar.freq_GHz = parseFloat(document.getElementById('slider_radarFreq').value);
+      state.radar.Br_MHz = parseFloat(document.getElementById('slider_radarBr').value);
+      state.radar.sjReq_dB = parseFloat(document.getElementById('slider_sjReq').value);
+
+      // Labels update
+      const pjDBm = 10 * Math.log10(state.jammer.Pj_W * 1000);
+      document.getElementById('val_jammerPj').innerText = `${state.jammer.Pj_W.toFixed(0)} W (${pjDBm.toFixed(1)} dBm)`;
+
+      const gjLin = Math.pow(10, state.jammer.Gj_dBi / 10);
+      document.getElementById('val_jammerGj').innerText = `${state.jammer.Gj_dBi.toFixed(1)} dBi (${gjLin.toFixed(1)}×)`;
+
+      document.getElementById('val_jammerBw').innerText = `${state.jammer.Bj_MHz} MHz`;
+
+      const rcsDBsm = 10 * Math.log10(state.target.rcs_m2);
+      document.getElementById('val_targetRcs').innerText = `${state.target.rcs_m2.toFixed(2)} m² (${rcsDBsm.toFixed(1)} dBsm)`;
+
+      const ptDBm = 10 * Math.log10(state.radar.Pt_kW * 1000 * 1000);
+      document.getElementById('val_radarPt').innerText = `${state.radar.Pt_kW} kW (${ptDBm.toFixed(1)} dBm)`;
+
+      const gtLin = Math.pow(10, state.radar.Gt_dBi / 10);
+      document.getElementById('val_radarGain').innerText = `${state.radar.Gt_dBi.toFixed(1)} dBi (${Math.round(gtLin)}×)`;
+
+      const lambda_cm = (C / (state.radar.freq_GHz * 1e9)) * 100;
+      let bandName = state.radar.freq_GHz < 4 ? "S-band" : (state.radar.freq_GHz < 8 ? "C-band" : "X-band");
+      document.getElementById('val_radarFreq').innerText = `${state.radar.freq_GHz.toFixed(1)} GHz (${bandName}, λ=${lambda_cm.toFixed(2)} cm)`;
+
+      document.getElementById('val_radarBr').innerText = `${state.radar.Br_MHz.toFixed(1)} MHz`;
+      document.getElementById('val_sjReq').innerText = `+${state.radar.sjReq_dB.toFixed(1)} dB`;
+    }
+
+    function handleJammerToggle() {
+      const toggle = document.getElementById('jammerPowerToggle');
+      state.jammer.active = toggle.checked;
+      document.getElementById('jammerToggleLabel').innerText = state.jammer.active ? "ACTIVE" : "STANDBY";
+      document.getElementById('jammerToggleLabel').className = state.jammer.active ? "ml-2 font-mono-code text-xs font-bold text-amber-400" : "ml-2 font-mono-code text-xs font-bold text-slate-500";
+      
+      if (state.audioEnabled && noiseGen) {
+        if (state.jammer.active) noiseGen.start();
+        else noiseGen.stop();
+      }
+    }
+
+    function setRcs(val) {
+      document.getElementById('slider_targetRcs').value = val;
+      updateParameters();
+    }
+
+    function setJammerPowerAndBw(powerW, bwMHz) {
+      document.getElementById('slider_jammerPj').value = powerW;
+      document.getElementById('slider_jammerBw').value = bwMHz;
+      updateParameters();
+    }
+
+    function toggleRadarSweep() {
+      state.radar.isSweeping = !state.radar.isSweeping;
+      const statusText = document.getElementById('sweepStatusText');
+      if (state.radar.isSweeping) {
+        statusText.innerText = "ON";
+        statusText.className = "text-emerald-400";
+      } else {
+        statusText.innerText = "PAUSED";
+        statusText.className = "text-slate-500";
+      }
+    }
+
+    function resetPosition() {
+      state.target.x_km = 22;
+      state.target.y_km = -22;
+    }
+
+    function switchRightTab(tab) {
+      const btnControls = document.getElementById('tabControlsBtn');
+      const btnMath = document.getElementById('tabMathBtn');
+      const contentControls = document.getElementById('tabControls');
+      const contentMath = document.getElementById('tabMath');
+
+      if (tab === 'controls') {
+        btnControls.className = "flex-1 py-3 px-4 border-b-2 border-cyan-400 text-cyan-300 font-hud tracking-wide flex items-center justify-center gap-2";
+        btnMath.className = "flex-1 py-3 px-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-hud tracking-wide flex items-center justify-center gap-2";
+        contentControls.classList.remove('hidden');
+        contentMath.classList.add('hidden');
+      } else {
+        btnMath.className = "flex-1 py-3 px-4 border-b-2 border-cyan-400 text-cyan-300 font-hud tracking-wide flex items-center justify-center gap-2";
+        btnControls.className = "flex-1 py-3 px-4 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-hud tracking-wide flex items-center justify-center gap-2";
+        contentMath.classList.remove('hidden');
+        contentControls.classList.add('hidden');
+      }
+    }
+
+    function applyPreset(preset) {
+      if (preset === 'standard_attack') {
+        // Attack Helicopter with 50W SPJ
+        setSlider('slider_jammerPj', 50);
+        setSlider('slider_jammerGj', 8.0);
+        setSlider('slider_jammerBw', 50);
+        setSlider('slider_targetRcs', 3.0);
+        setSlider('slider_radarPt', 150);
+        setSlider('slider_radarGain', 34);
+        setSlider('slider_radarFreq', 9.0);
+        state.target.x_km = 25;
+        state.target.y_km = -20;
+      } else if (preset === 'max_power_spot') {
+        // High Power 100W Spot Jammer
+        setSlider('slider_jammerPj', 100);
+        setSlider('slider_jammerGj', 12.0);
+        setSlider('slider_jammerBw', 20);
+        setSlider('slider_targetRcs', 2.0);
+        setSlider('slider_radarPt', 200);
+        setSlider('slider_radarGain', 35);
+        setSlider('slider_radarFreq', 9.5);
+        state.target.x_km = 20;
+        state.target.y_km = -15;
+      } else if (preset === 'stealth_recon') {
+        // Low-RCS Recon with 20W Jammer
+        setSlider('slider_jammerPj', 20);
+        setSlider('slider_jammerGj', 6.0);
+        setSlider('slider_jammerBw', 80);
+        setSlider('slider_targetRcs', 0.2);
+        setSlider('slider_radarPt', 180);
+        setSlider('slider_radarGain', 36);
+        setSlider('slider_radarFreq', 9.0);
+        state.target.x_km = 14;
+        state.target.y_km = -12;
+      } else if (preset === 'heavy_cargo') {
+        // Heavy Cargo Helicopter with 10W Low Power Jammer
+        setSlider('slider_jammerPj', 10);
+        setSlider('slider_jammerGj', 3.0);
+        setSlider('slider_jammerBw', 100);
+        setSlider('slider_targetRcs', 15.0);
+        setSlider('slider_radarPt', 150);
+        setSlider('slider_radarGain', 34);
+        setSlider('slider_radarFreq', 5.0);
+        state.target.x_km = 35;
+        state.target.y_km = -16;
+      }
+
+      const toggle = document.getElementById('jammerPowerToggle');
+      toggle.checked = true;
+      state.jammer.active = true;
+      handleJammerToggle();
+      updateParameters();
+    }
+
+    function setSlider(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    }
+
+    function resizeCanvas() {
+      const rect = canvasContainer.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+
+      ctx.scale(dpr, dpr);
+      state.view.centerX = rect.width / 2;
+      state.view.centerY = rect.height / 2;
+      const minDim = Math.min(rect.width, rect.height);
+      state.view.scale = (minDim * 0.44) / state.view.maxRange_km;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    function kmToCanvas(x_km, y_km) {
+      return {
+        x: state.view.centerX + x_km * state.view.scale,
+        y: state.view.centerY + y_km * state.view.scale
+      };
+    }
+
+    function canvasToKm(canvasX, canvasY) {
+      return {
+        x: (canvasX - state.view.centerX) / state.view.scale,
+        y: (canvasY - state.view.centerY) / state.view.scale
+      };
+    }
+
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    function isPointerNearHeli(pos) {
+      const heliPx = kmToCanvas(state.target.x_km, state.target.y_km);
+      const dist = Math.hypot(pos.x - heliPx.x, pos.y - heliPx.y);
+      return dist <= 35;
+    }
+
+    function onPointerDown(e) {
+      const pos = getPointerPos(e);
+      if (isPointerNearHeli(pos)) {
+        state.target.isDragging = true;
+      } else {
+        const kmPos = canvasToKm(pos.x, pos.y);
+        const dist = Math.hypot(kmPos.x, kmPos.y);
+        if (dist <= state.view.maxRange_km * 0.95 && dist >= 2) {
+          state.target.x_km = kmPos.x;
+          state.target.y_km = kmPos.y;
+          state.target.isDragging = true;
+        }
+      }
+    }
+
+    function onPointerMove(e) {
+      const pos = getPointerPos(e);
+      if (state.target.isDragging) {
+        const kmPos = canvasToKm(pos.x, pos.y);
+        const dist = Math.hypot(kmPos.x, kmPos.y);
+        if (dist <= state.view.maxRange_km * 0.96 && dist >= 2) {
+          state.target.x_km = kmPos.x;
+          state.target.y_km = kmPos.y;
+        }
+      } else {
+        canvas.style.cursor = isPointerNearHeli(pos) ? 'grab' : 'crosshair';
+      }
+    }
+
+    function onPointerUp() {
+      state.target.isDragging = false;
+      canvas.style.cursor = 'crosshair';
+    }
+
+    canvas.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+
+    let frameCount = 0;
+
+    // Canvas drawing routine
+    function drawRadarDisplay(calc) {
+      const w = canvasContainer.clientWidth;
+      const h = canvasContainer.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = state.view.centerX;
+      const cy = state.view.centerY;
+      const scale = state.view.scale;
+
+      // 1. PPI Range Rings
+      const ringIntervals = [10, 20, 30, 40, 50, 60];
+      ctx.lineWidth = 1;
+      
+      ringIntervals.forEach(r => {
+        const radiusPx = r * scale;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radiusPx, 0, 2 * Math.PI);
+        ctx.strokeStyle = (r === 60) ? 'rgba(0, 229, 255, 0.45)' : 'rgba(0, 229, 255, 0.12)';
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.5)';
+        ctx.font = '9px "JetBrains Mono", monospace';
+        ctx.fillText(`${r} km`, cx + 4, cy - radiusPx + 11);
+      });
+
+      // 2. Azimuth radial lines
+      for (let angleDeg = 0; angleDeg < 360; angleDeg += 30) {
+        const rad = (angleDeg - 90) * Math.PI / 180;
+        const outerR = 60 * scale;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(rad) * outerR, cy + Math.sin(rad) * outerR);
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.08)';
+        ctx.stroke();
+      }
+
+      // 3. Burn-Through Boundary Sector (R_bt Circle)
+      if (state.jammer.active && calc.Rbt_km > 0 && calc.Rbt_km <= state.view.maxRange_km * 1.5) {
+        const rbtPx = calc.Rbt_km * scale;
+        
+        // Shaded Burn-Through Region
+        const burnGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rbtPx);
+        burnGrad.addColorStop(0, 'rgba(255, 51, 68, 0.07)');
+        burnGrad.addColorStop(0.85, 'rgba(255, 51, 68, 0.04)');
+        burnGrad.addColorStop(1, 'rgba(255, 51, 68, 0.18)');
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, rbtPx, 0, 2 * Math.PI);
+        ctx.fillStyle = burnGrad;
+        ctx.fill();
+
+        // Pulsing Burn-Through Ring
+        ctx.beginPath();
+        ctx.arc(cx, cy, rbtPx, 0, 2 * Math.PI);
+        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = 'rgba(255, 51, 68, 0.85)';
+        ctx.shadowColor = 'rgba(255, 51, 68, 0.6)';
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
+
+        // Label on Burn-Through Ring
+        ctx.fillStyle = '#ff3344';
+        ctx.font = 'bold 10px "Orbitron", monospace';
+        ctx.fillText(`BURN-THROUGH THRESHOLD R_bt = ${calc.Rbt_km.toFixed(1)} km`, cx - rbtPx + 10, cy - 8);
+      }
+
+      // 4. Jammer Noise Strobe & Screening Wedge
+      const heliPos = kmToCanvas(state.target.x_km, state.target.y_km);
+      const angleToHeli = Math.atan2(heliPos.y - cy, heliPos.x - cx);
+      const outerR = 60 * scale;
+
+      if (state.jammer.active) {
+        const strobeWidthRad = 0.16; // ~9.2 degrees
+        const strobeGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, outerR);
+
+        if (calc.isBurnThrough) {
+          // Attenuated strobe when skin echo penetrates
+          strobeGrad.addColorStop(0, 'rgba(255, 170, 0, 0.35)');
+          strobeGrad.addColorStop(0.5, 'rgba(255, 170, 0, 0.15)');
+          strobeGrad.addColorStop(1, 'rgba(255, 170, 0, 0.02)');
+        } else {
+          // Bright blinding strobe obscuring radar target
+          strobeGrad.addColorStop(0, 'rgba(255, 170, 0, 0.7)');
+          strobeGrad.addColorStop(0.4, 'rgba(255, 170, 0, 0.45)');
+          strobeGrad.addColorStop(0.8, 'rgba(255, 90, 0, 0.25)');
+          strobeGrad.addColorStop(1, 'rgba(255, 170, 0, 0.05)');
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, outerR, angleToHeli - strobeWidthRad / 2, angleToHeli + strobeWidthRad / 2);
+        ctx.closePath();
+        ctx.fillStyle = strobeGrad;
+        ctx.fill();
+
+        // Flickering noise speckles
+        if (!calc.isBurnThrough) {
+          ctx.save();
+          ctx.clip();
+          ctx.fillStyle = 'rgba(255, 230, 150, 0.4)';
+          for (let p = 0; p < 28; p++) {
+            const pr = Math.random() * outerR;
+            const pAngle = angleToHeli + (Math.random() - 0.5) * strobeWidthRad;
+            const px = cx + Math.cos(pAngle) * pr;
+            const py = cy + Math.sin(pAngle) * pr;
+            ctx.fillRect(px, py, 1.5, 1.5);
+          }
+          ctx.restore();
+        }
+
+        // Ray line from jammer to radar
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(heliPos.x, heliPos.y);
+        ctx.strokeStyle = calc.isBurnThrough ? 'rgba(255, 170, 0, 0.35)' : 'rgba(255, 170, 0, 0.85)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 5. Rotating Radar Sweep Beam
+      if (state.radar.isSweeping) {
+        state.radar.azimuth = (state.radar.azimuth + state.radar.sweepSpeed) % (2 * Math.PI);
+      }
+      const sweepRad = state.radar.azimuth;
+      const sweepLen = 60 * scale;
+
+      const sweepGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sweepLen);
+      sweepGrad.addColorStop(0, 'rgba(0, 229, 255, 0.4)');
+      sweepGrad.addColorStop(1, 'rgba(0, 229, 255, 0.0)');
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, sweepLen, sweepRad - 0.25, sweepRad);
+      ctx.closePath();
+      ctx.fillStyle = sweepGrad;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(sweepRad) * sweepLen, cy + Math.sin(sweepRad) * sweepLen);
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 1.6;
+      ctx.shadowColor = '#00e5ff';
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Audio trigger on sweep passing target
+      const sweepAngleDiff = Math.abs(((sweepRad - angleToHeli + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      if (sweepAngleDiff < 0.04) {
+        playRadarHitTone(calc.isBurnThrough);
+      }
+
+      // 6. Air Defence Radar HQ Center Icon
+      ctx.beginPath();
+      ctx.arc(cx, cy, 7, 0, 2 * Math.PI);
+      ctx.fillStyle = '#00e5ff';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#070b12';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, 14, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 9px "Orbitron", monospace';
+      ctx.fillText("SAM RADAR SITE", cx - 42, cy + 24);
+
+      // 7. Draggable Helicopter
+      drawHelicopterSymbol(heliPos.x, heliPos.y, angleToHeli, calc);
+
+      frameCount++;
+    }
+
+    function drawHelicopterSymbol(x, y, angleToRadar, calc) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      const isBurn = calc.isBurnThrough;
+      const isJam = state.jammer.active;
+
+      let mainColor = '#00e5ff';
+      if (isJam && !isBurn) mainColor = '#ffaa00';
+      if (isJam && isBurn) mainColor = '#ff3344';
+
+      if (state.target.isDragging) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 26, 0, 2 * Math.PI);
+        ctx.strokeStyle = mainColor;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Radiating jammer emission arcs (10W-100W)
+      if (isJam) {
+        const waveAngle = angleToRadar + Math.PI;
+        for (let i = 1; i <= 3; i++) {
+          const waveR = 15 + i * 8 + (frameCount % 12);
+          ctx.beginPath();
+          ctx.arc(0, 0, waveR, waveAngle - 0.6, waveAngle + 0.6);
+          ctx.strokeStyle = `rgba(255, 170, 0, ${0.75 - i * 0.18})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+
+      // Target Reticle
+      ctx.beginPath();
+      const s = 14;
+      ctx.moveTo(0, -s);
+      ctx.lineTo(s, 0);
+      ctx.lineTo(0, s);
+      ctx.lineTo(-s, 0);
+      ctx.closePath();
+      ctx.strokeStyle = mainColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Helicopter Airframe
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 4, 11, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.strokeStyle = mainColor;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Tail Boom
+      ctx.beginPath();
+      ctx.moveTo(0, 11);
+      ctx.lineTo(0, 20);
+      ctx.lineTo(-3, 22);
+      ctx.moveTo(0, 20);
+      ctx.lineTo(3, 22);
+      ctx.strokeStyle = mainColor;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Rotor Blades
+      const rotorAngle = frameCount * 0.4;
+      ctx.save();
+      ctx.rotate(rotorAngle);
+      ctx.beginPath();
+      ctx.moveTo(-18, 0);
+      ctx.lineTo(18, 0);
+      ctx.moveTo(0, -18);
+      ctx.lineTo(0, 18);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+
+      // Onboard SPJ pod dot
+      ctx.beginPath();
+      ctx.arc(0, 0, 3, 0, 2 * Math.PI);
+      ctx.fillStyle = isJam ? '#ffaa00' : '#475569';
+      ctx.fill();
+
+      // Target Label
+      ctx.font = 'bold 9px "JetBrains Mono", monospace';
+      ctx.fillStyle = mainColor;
+      ctx.fillText(`HELI (Pj=${state.jammer.Pj_W}W, σ=${state.target.rcs_m2}m²)`, 18, -6);
+      
+      const tagText = !isJam ? "CLEAR ECHO" : (isBurn ? "BURN-THROUGH!" : "JAMMER SCREENED");
+      ctx.font = '8px "JetBrains Mono", monospace';
+      ctx.fillStyle = isBurn ? '#ff3344' : (isJam ? '#ffaa00' : '#00e5ff');
+      ctx.fillText(tagText, 18, 6);
+
+      ctx.restore();
+    }
+
+    function animationLoop() {
+      const calc = computePhysics();
+      updateHUDReadouts(calc);
+      drawRadarDisplay(calc);
+      requestAnimationFrame(animationLoop);
+    }
+
+    window.onload = function() {
+      resizeCanvas();
+      updateParameters();
+      renderMathFormulas();
+      lucide.createIcons();
+      animationLoop();
+    };
+  </script>
+</body>
+</html>
